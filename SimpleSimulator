@@ -1,0 +1,301 @@
+import sys                                    
+program = sys.stdin.read().splitlines()
+
+# dictionaries which maps codes with instruction & registers.
+
+op_mapping = { "10000":["add"] , "10001":["sub"] , "10010":["mov"] , "10011":["mov"] , "10100":["ld"] ,
+       "10101":["st"] , "10110":["mul"] , "10111":["div"] , "11000":["rs"] , "11001":["ls"] ,
+       "11010":["xor"] , "11011":["or"] , "11100":["and"] ,"11101":["not"] , "11110":["cmp"] ,
+       "11111":["jmp"] , "01100":["jlt"] , "01101":["jgt"] , "01111":["je"] , "01010":["hlt"] }
+
+register_map = { "000":0 , "001":1 , "010":2 , "011":3 , "100":4 , "101":5 , "110":6 , "111":7 }
+
+A=["A","10000","10001","10110","11010","11011","11100"]
+B=["B","10010","11000","11001"]
+C=["C","10011","11101","11110"]
+D=["D","1…
+[11:52 pm, 06/08/2022] Uttam: # standard input 
+import sys                                    
+program = sys.stdin.read().splitlines()
+
+# dictionaries which maps codes with instruction & registers.
+
+Opcode_mapping = { "10000":["add"] , "10001":["sub"] , "10010":["mov"] , "10011":["mov"] , "10100":["ld"] ,
+       "10101":["st"] , "10110":["mul"] , "10111":["div"] , "11000":["rs"] , "11001":["ls"] ,
+       "11010":["xor"] , "11011":["or"] , "11100":["and"] ,"11101":["not"] , "11110":["cmp"] ,
+       "11111":["jmp"] , "01100":["jlt"] , "01101":["jgt"] , "01111":["je"] , "01010":["hlt"] }
+
+register_map = { "000":[0,"r0"] , "001":[1,"r1"] , "010":[2,"r2"] , "011":[3,"r3"] , "100":[4,"r4"] , "101":[5,"r5"] , "110":[6,"r6"] , "111":[7,"r7"] }
+# list of type and corresponding opcodes
+A=["A","10000","10001","10110","11010","11011","11100"]
+B=["B","10010","11000","11001"]
+C=["C","10011","11101","11110"]
+D=["D","10100","10101"]
+E=["E","11111","01100","01101","01110"]
+F=["F","01010"]
+# List of list  of type opcode
+TYPE=[A,B,C,D,E,F] 
+
+flags=[0,0,0,0]
+registers=[0,0,0,0,0,0,0,flags]
+
+halted = False
+
+# Function which returns instruction and type of a opcode.
+
+def check_instruction(each_line):
+    opcode=each_line[:5]
+    instruction = Opcode_mapping[opcode][0]
+    return instruction
+def check_type(line):
+    opcode=line[:5]
+    for i in range(6):
+        if opcode in TYPE[i]:
+            type=TYPE[i][0]
+    return type        
+
+# Function which handles all operations of the type A.
+
+def TYPE_A(instruction,line) :
+    op1 = registers[register_map[line[10:13]][0]]
+    op2 = registers[register_map[line[13:]][0]]
+    if instruction == "add" :
+        result = op1 + op2
+        result = check_overflow(result)
+        return result
+    elif instruction == "sub" :
+        result = op1 - op2
+        result = check_overflow(result)
+        return result
+    elif instruction == "mul" :
+        result = op1 * op2
+        result = check_overflow(result)
+        return result
+    elif instruction == "xor" :
+        result= op1 ^ op2
+        return result
+    elif instruction == "or" :
+        result = op1 | op2
+        return result
+    elif instruction == "and" :
+        result = op1 & op2
+        return result
+
+# Function which handles all operations of the type B.
+
+def TYPE_B(instruction,line) :
+    immediate = int(line[8:],2)
+    register = registers[register_map[line[5:8]][0]]
+    if instruction == "mov" :
+        return immediate
+    elif instruction == "rs" :
+        return register>>immediate
+    elif instruction == "ls" :
+        return register << immediate
+
+# Function which handles all operations of the type C.
+
+def TYPE_C(instruction,line) :
+    updateReg = registers[register_map[line[10:13]][0]]
+    reg = registers[register_map[line[13:]][0]]
+    if instruction == "mov" :
+        if reg == flags :
+            reg = int(converter_flag(),2)
+        reset_flag()
+        return reg
+    elif instruction == "div" :
+        registers[0]= updateReg / reg
+        registers[1] = updateReg % reg
+        return updateReg
+    elif instruction == "not" :
+        return reg ^ 65535
+    elif instruction == "cmp" :
+        if updateReg == reg :
+            flags[3]=1
+        elif updateReg > reg:
+            flags[2]=1
+        else:
+            flags[1]=1
+        return updateReg
+
+# Function which handles all operations of the type D.
+
+def TYPE_D(instruction,line):
+    mem = int(line[8:], 2)
+    # y_axis.append(mem)
+    # x_axis.append(cycle_counter)
+    reg = registers[register_map[line[5:8]][0]]
+    if instruction == "ld" :
+        return int(memory[mem], 2)
+    elif instruction == "st" :
+        memory[mem] = convert_16bit(reg)
+        return reg
+
+# Function which handles all operations of the type E.
+
+def TYPE_E(instruction,line) :
+    mem = int(line[8:], 2)
+    global pc
+    if instruction == "jmp" :
+        pc = mem - 1
+    elif instruction == "jlt" :
+        if flags[1] == 1 :
+            pc = mem - 1
+    elif instruction == "jgt" :
+        if flags[2] == 1 :
+            pc = mem - 1 
+    elif instruction == "je" :
+        if flags[3] == 1 :
+            pc = mem - 1
+    else:
+        pass        
+    reset_flag()
+
+# Function which handles all operations of the type F.
+
+def TYPE_F() :
+    global halted
+    halted=True
+
+# Function which identifies the type of instruction and calls corresponding function.
+
+def registers_allocation(line,instruction):
+    type = check_type(line)
+    checking_reset(instruction,type)
+    if type == "A" :
+        ra=line[7:10]
+        value=register_map[ra][0]
+        registers[value] = TYPE_A(instruction,line)
+    elif type == "B" :
+        rb=line[5:8]
+        value=register_map[rb][0]
+        registers[register_map[rb][0]] = TYPE_B(instruction,line)
+    elif type == "C" :
+        rc=line[10:13]
+        value=register_map[rc][0]
+        registers[value] = TYPE_C(instruction,line)
+    elif type == "D" :
+        # mem=int(line[8:],2)
+        # uncommet for Q4
+        # y_axis.append(mem)
+        # x_axis.append(cycle_counter)
+        rd=line[5:8]
+        value=register_map[rd][0]
+        registers[value] = TYPE_D(instruction,line)
+    elif type == "E" :
+        TYPE_E(instruction,line)
+    else:
+        TYPE_F()
+
+# Function which checks the overflow's in the calculations.
+
+def check_overflow(reg):
+    if(reg<0):
+        reg=0
+        flags[0]=1
+    
+    if(reg>65535):
+        flags[0]=1
+        reg=lower_16(reg)
+    return reg
+
+# A util function for overflow ( takes lower 16 bits in case of an overflow )
+def lower_16(n):
+    b = bin(n)[2:]
+    l = len(b)-16
+    n = int(b[l:],2)
+    return n
+
+# Function which resets the flags after every instruction.
+def checking_reset(ins,typ):
+    if ins == "jlt" or ins == "jgt" or ins == "je":
+        return   
+    if(ins == "mov" and typ == "C") :
+        return
+    else:
+        reset_flag()
+# resting flags to zero
+def reset_flag() :
+    for i in range(4) :
+        flags[i] = 0 
+# converting number to 16 bit         
+def convert_16bit(number) :
+    a = bin(int(number))[2:]
+    b = (16-len(a)) * "0" + a
+    return b
+# converting a number to 8 bit     
+def convert_8bit(number) :
+    a = bin(int(number))[2:]
+    b = (8-len(a)) * "0" + a
+    return b
+# flag converter     
+def converter_flag() :
+    f = "000000000000"
+    for i in flags:
+        f = f + str(i)
+    return f
+
+# print the state of registers after execution of every instruction
+def create(pc):
+    reg_value=""
+    for i in range(7):
+        value=convert_16bit(registers[i])
+        reg_value=reg_value +" "+ value
+    print(convert_8bit(pc)+reg_value+" "+converter_flag())    
+
+# inslization of memory to zero 
+List = "0" * 16
+length = 0
+for line in program:
+    length = length +1
+if(length <= 256):
+    memory = [List] * 256
+else:
+    memory= [List] * length     
+
+# intialize all 256 memory to 0 at the start of the execution
+i=0
+while(i!=len(program)):
+    each_line=program[i]
+    memory[i] = each_line
+    i = i + 1
+
+# this loop reads the file line by line and executes
+pc=0  # this is progrma counter
+
+# uncommet for graph 
+# cycle_counter=0
+# memorystore=[]
+# cycle=[]
+# y_axis=[]
+# x_axis=[]
+
+while halted == False:
+    each_line = program[pc]
+    opcode = each_line[:5]
+    instruction = check_instruction(each_line)
+    currentpc = pc
+    registers_allocation(each_line,instruction)
+    create(currentpc)
+    pc = pc + 1
+    # uncomment for graph 
+    # cycle.append(cycle_counter)
+    # memorystore.append(currentpc)
+    # cycle_counter+=1
+
+# to print the memory dump execution has finshed
+c=0
+while(c!=256) :
+    print(memory[c])
+    c = c + 1
+# uncommet for Q4 graph    
+#to plot the graph between the cycle no and corresponding memory address that was being accessed at that time
+# #plotting part***
+# import matplotlib.pyplot as plt
+# import numpy as np
+# cycle.extend(x_axis)
+# memory.extend(y_axis)
+# plt.scatter(np.array(cycle),np.array(memory),marker="*")
+# plt.xlabel("cycle")
+# plt.ylabel("memory")
+# plt.show()
